@@ -1,4 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using System;
+using System.IO;
+using System.Text;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Gelf.Extensions.Logging
@@ -20,9 +23,13 @@ namespace Gelf.Extensions.Logging
                 || value is decimal;
         }
 
-        public static string ToJson(this GelfMessage message)
+        private static JObject GetJObject(GelfMessage message)
         {
-            var messageJson = JObject.FromObject(message);
+            var messageJson = JObject.FromObject(message, new JsonSerializer
+            {
+                NullValueHandling = NullValueHandling.Ignore,
+                Formatting = Formatting.None
+            });
 
             foreach (var field in message.AdditionalFields)
             {
@@ -36,10 +43,36 @@ namespace Gelf.Extensions.Logging
                 }
             }
 
-            return JsonConvert.SerializeObject(messageJson, Formatting.None, new JsonSerializerSettings
+            return messageJson;
+        }
+
+        public static string ToJsonString(this GelfMessage message)
+        {
+            return GetJObject(message).ToString(Formatting.None);
+        }
+
+        public static Stream ToJsonStream(this GelfMessage message)
+        {
+            var stream = new MemoryStream();
+
+            try
             {
-                NullValueHandling = NullValueHandling.Ignore
-            });
+                using (var streamWriter = new StreamWriter(stream, new UTF8Encoding(false), 1024, leaveOpen: true))
+                using (var jsonWriter = new JsonTextWriter(streamWriter) {Formatting = Formatting.None})
+                {
+                    GetJObject(message).WriteTo(jsonWriter);
+                    jsonWriter.Flush();
+
+                    stream.Seek(0, SeekOrigin.Begin);
+                }
+            }
+            catch (Exception)
+            {
+                stream.Dispose();
+                throw;
+            }
+
+            return stream;
         }
     }
 }

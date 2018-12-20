@@ -6,6 +6,12 @@
 
 The following examples are for ASP.NET Core. The [samples](/samples) directory contains example console apps with and without ASP.NET Core. For more information on providers and logging in general, see the aspnetcore [logging documentation](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging?tabs=aspnetcore2x#how-to-add-providers).
 
+Start by installing the [NuGet package](https://www.nuget.org/packages/Gelf.Extensions.Logging).
+
+```sh
+dotnet add package Gelf.Extensions.Logging
+```
+
 ### ASP.NET Core 2.x
 
 In `Program.cs`, import the `LoggingBuilder.AddGelf()` extension method from `Gelf.Extensions.Logging` and add the following to your `WebHost` configuration.
@@ -46,9 +52,9 @@ Logger options are taken from the "GELF" provider section in `appsettings.json` 
     },
     "GELF": {
       "Host": "localhost",
-      "Port": 12201,    // Not required if using default 12201.
-      "LogSource": "my-app-name",   // Required if not set in code.
-      "AdditionalFields": {     // Optional fields added to all logs.
+      "Port": 12201,                // Not required if using default 12201.
+      "LogSource": "my-app-name",   // Not required if set in code.
+      "AdditionalFields": {         // Optional fields added to all logs.
         "project_name": "my-project-name"
       },
       "LogLevel": {

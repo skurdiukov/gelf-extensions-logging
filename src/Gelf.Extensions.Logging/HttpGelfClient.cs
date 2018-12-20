@@ -1,6 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.Net.Http;
-using System.Text;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 
 namespace Gelf.Extensions.Logging
@@ -35,9 +36,25 @@ namespace Gelf.Extensions.Logging
 
         public async Task SendMessageAsync(GelfMessage message)
         {
-            var content = new StringContent(message.ToJson(), Encoding.UTF8, "application/json");
-            var result = await _httpClient.PostAsync("gelf", content);
-            result.EnsureSuccessStatusCode();
+            using (var stream = message.ToJsonStream())
+            {
+                await SendMessageAsync(stream);
+            }
+        }
+
+        private async Task SendMessageAsync(Stream stream)
+        {
+            using (var content = new StreamContent(stream))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, "gelf"))
+            {
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                request.Content = content;
+
+                using (var response = await _httpClient.SendAsync(request))
+                {
+                    response.EnsureSuccessStatusCode();
+                }
+            }
         }
 
         public void Dispose()

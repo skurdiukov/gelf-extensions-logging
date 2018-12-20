@@ -30,7 +30,7 @@ namespace Gelf.Extensions.Logging
 
         public async Task SendMessageAsync(GelfMessage message)
         {
-            var messageBytes = Encoding.UTF8.GetBytes(message.ToJson());
+            var messageBytes = Encoding.UTF8.GetBytes(message.ToJsonString());
 
             if (_options.CompressUdp && messageBytes.Length > _options.UdpCompressionThreshold)
             {
