@@ -46,6 +46,8 @@ namespace Gelf.Extensions.Logging
             {
                 case GelfProtocol.Udp:
                     return new UdpGelfClient(options);
+                case GelfProtocol.Tcp:
+                    return new TcpGelfClient(options);
                 case GelfProtocol.Http:
                 case GelfProtocol.Https:
                     return new HttpGelfClient(options);

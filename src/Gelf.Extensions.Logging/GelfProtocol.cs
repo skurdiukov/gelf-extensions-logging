@@ -4,6 +4,7 @@
     {
         Udp,
         Http,
-        Https
+        Https,
+        Tcp,
     }
 }

@@ -26,6 +26,7 @@ namespace Gelf.Extensions.Logging.Tests.Fixtures
                     Accept = {new MediaTypeWithQualityHeaderValue("application/json")}
                 }
             };
+            _httpClient.DefaultRequestHeaders.Add("X-Requested-By", "cli");
         }
 
         public async Task<dynamic> GetAsync(string url, CancellationToken cancellation = default)
