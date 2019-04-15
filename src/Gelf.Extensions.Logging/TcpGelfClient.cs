@@ -1,9 +1,8 @@
-﻿using System.Collections.Concurrent;
-using System.IO;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
 namespace Gelf.Extensions.Logging
 {
@@ -11,57 +10,88 @@ namespace Gelf.Extensions.Logging
     {
         private static readonly byte[] Separator = { 0x00 };
 
+        private static readonly TimeSpan ExpirationTime = TimeSpan.FromMinutes(5);
+
         private readonly GelfLoggerOptions _options;
 
-        private readonly ConcurrentBag<NetworkStream> _streams;
+        private readonly ConcurrentQueue<Sender> _cachedSenders;
+
+        private readonly Semaphore _semaphore;
 
         public TcpGelfClient(GelfLoggerOptions options)
         {
             _options = options;
-            _streams = new ConcurrentBag<NetworkStream>();
+            _cachedSenders = new ConcurrentQueue<Sender>();
+            _semaphore = new Semaphore(options.MaxTcpConnections, options.MaxTcpConnections);
         }
 
         public async Task SendMessageAsync(GelfMessage message)
         {
-            NetworkStream stream = null;
+            _semaphore.WaitOne();
+
+            Sender sender = default;
             try
             {
-                stream = await GetStream();
-                await message.WriteToStreamAsync(stream);
-                await stream.WriteAsync(Separator, 0, Separator.Length);
+                sender = await GetPooledSender();
+                await message.WriteToStreamAsync(sender.Stream);
+                await sender.Stream.WriteAsync(Separator, 0, Separator.Length);
+
+                ReturnSender(sender);
             }
-            catch (SocketException)
+            catch (Exception)
             {
-                stream?.Dispose();
-                stream = null;
+                DestroySender(sender);
             }
             finally
             {
-                if (stream != null)
-                    ReturnStream(stream);
+                _semaphore.Release();
             }
         }
 
-        private async Task<NetworkStream> GetStream()
+        private async Task<Sender> GetPooledSender()
         {
-            if (_streams.TryTake(out var stream))
-                return stream;
+            if (_cachedSenders.TryDequeue(out var sender))
+                return sender;
 
             var client = new TcpClient();
             await client.ConnectAsync(_options.Host, _options.Port);
-            return client.GetStream();
+            return new Sender(client.GetStream());
         }
 
-        private void ReturnStream(NetworkStream stream)
+        private void DestroySender(Sender sender)
         {
-            _streams.Add(stream);
+            sender.Stream?.Dispose();
+        }
+
+        private void ReturnSender(Sender sender)
+        {
+            if (sender.Expire > DateTime.Now)
+            {
+                DestroySender(sender);
+            }
+
+            _cachedSenders.Enqueue(sender);
         }
 
         public void Dispose()
         {
-            while (_streams.TryTake(out var socket))
+            _semaphore.Dispose();
+            while (_cachedSenders.TryDequeue(out var sender))
             {
-                socket.Dispose();
+                DestroySender(sender);
+            }
+        }
+
+        internal struct Sender
+        {
+            public readonly NetworkStream Stream;
+
+            public readonly DateTime Expire;
+
+            public Sender(NetworkStream stream)
+            {
+                Stream = stream;
+                Expire = DateTime.Now + ExpirationTime;
             }
         }
     }

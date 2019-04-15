@@ -78,5 +78,10 @@ namespace Gelf.Extensions.Logging
         /// Timeout used when sending logs via HTTP(S).
         /// </summary>
         public TimeSpan HttpTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Gets or sets the maximum current connections.
+        /// </summary>
+        public int MaxTcpConnections { get; set; } = 1;
     }
 }
